@@ -61,26 +61,29 @@ func (s *InventoryService) ProcessOrderMessage(ctx context.Context) error {
 
 func (s *InventoryService) UpdateInventoryAndPublish(ctx context.Context, order models.Order) error {
 	// insert into inventory
-	query := `INSERT INTO inventory (id, name, quantity, price) VALUES($1, $2, $3, $4)`
+	var inventory models.Inventory
+	query := `INSERT INTO inventory ( product_id, quantity ) VALUES($1, $2) RETURNING id, product_id, quantity, created_at`
 
-	res, err := s.db.Exec(ctx, query, order.ID, "witty-product-name", order.Quantity, 300.30)
+	err := s.db.QueryRow(ctx, query, order.ProductId, order.Quantity).Scan(&inventory.Id, &inventory.ProductId, &inventory.Quantity, &inventory.CreatedAt)
 
 	if err != nil {
 		slog.Error("Failed to add inventory to db", "err", err)
-		return err
-	}
-
-	if res.RowsAffected() == 0 {
-		slog.Error("failed to insert row to db")
-		return fmt.Errorf("failed to insert row to db")
+		return fmt.Errorf("failed to insert inventory: %w", err)
 	}
 
 	// PUBLISH TO SNS FOR A NOTIFICATION
-	message := fmt.Sprintf("Inventory created for item %s", order.ItemID)
-	s.snsClient.Publish(ctx, &sns.PublishInput{
+	message := fmt.Sprintf("Inventory created for item %s", order.ID)
+	_, err = s.snsClient.Publish(ctx, &sns.PublishInput{
 		TopicArn: s.topicArn,
 		Message:  &message,
 	})
+	if err != nil {
+		slog.Error("Failed to publish SNS message", "order_id", order.ID, "err", err)
+		return fmt.Errorf("failed to publish message to SNS: %w", err)
+
+	}
+
+	slog.Info("Successfully created inventory and published message", "product_id", order.ProductId, "quantity", order.Quantity)
 
 	return nil
 }

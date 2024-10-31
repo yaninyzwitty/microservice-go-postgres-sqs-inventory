@@ -2,14 +2,20 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/signal"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/yaninyzwitty/sqs-postgres-microservice-inventory/internal/aws"
 	"github.com/yaninyzwitty/sqs-postgres-microservice-inventory/internal/database"
 	"github.com/yaninyzwitty/sqs-postgres-microservice-inventory/internal/pkg"
 	"github.com/yaninyzwitty/sqs-postgres-microservice-inventory/service"
+	"github.com/yaninyzwitty/sqs-postgres-microservice-inventory/shared"
 )
 
 var (
@@ -31,7 +37,7 @@ func main() {
 		slog.Error("failed to open config file", "error", err)
 		os.Exit(1)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 32*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 320*time.Second)
 	defer cancel()
 	var cfg pkg.Config
 
@@ -69,5 +75,20 @@ func main() {
 	inventoryService := service.NewInventoryService(db, snsClient, sqsClient, &snsTopicArn, &queueURL)
 	// process all order messages
 	inventoryService.ProcessOrderMessage(ctx)
+	mux := chi.NewRouter()
+	mux.Use(middleware.Logger)
+
+	server := &http.Server{
+		Addr:    ":" + fmt.Sprintf("%d", cfg.Server.PORT),
+		Handler: mux,
+	}
+
+	go shared.StartServer(server)
+	slog.Info("server is running at port", "port", cfg.Server.PORT)
+	quitCH := make(chan os.Signal, 1)
+	signal.Notify(quitCH, os.Interrupt)
+
+	<-quitCH
+	shared.ShutdownServer(server)
 
 }

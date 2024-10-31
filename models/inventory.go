@@ -7,9 +7,8 @@ import (
 )
 
 type Inventory struct {
-	ID        uuid.UUID
-	Name      string
-	Quantity  uint
-	Price     float64
-	CreatedAt time.Time
+	Id        uuid.UUID `json:"id"`
+	ProductId uuid.UUID `json:"product_id"`
+	Quantity  int       `json:"quantity"`
+	CreatedAt time.Time `json:"created_at"`
 }
