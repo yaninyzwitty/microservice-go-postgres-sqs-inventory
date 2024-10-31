@@ -1,0 +1,8 @@
+server:
+  port: 8080
+
+database:
+  database_url: postgresql://myuser:mypassword@localhost:5432/mydatabase?sslmode=disable
+
+aws:
+  region: eu-north-1
