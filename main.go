@@ -47,6 +47,19 @@ func main() {
 	}
 	defer db.Close()
 
+	snsClient, err := aws.LoadSnsConfig(ctx, cfg.AWS.Region)
+	if err != nil {
+		slog.Error("failed to load and create sns client", "error", err)
+		os.Exit(1)
+	}
+
+	snsTopicArn, err := aws.CreateSnsTopicARN(ctx, "witty-topic", snsClient)
+	if err != nil {
+		slog.Error("Failed to create sns topic", "error", err)
+		os.Exit(1)
+	}
+	fmt.Println(snsTopicArn)
+
 	sqsClient, err := aws.LoadSQSClient(ctx, cfg.AWS.Region)
 	if err != nil {
 		slog.Error("failed to load  and create sqs client", "error", err)
