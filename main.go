@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"time"
@@ -10,7 +9,15 @@ import (
 	"github.com/yaninyzwitty/sqs-postgres-microservice-inventory/internal/aws"
 	"github.com/yaninyzwitty/sqs-postgres-microservice-inventory/internal/database"
 	"github.com/yaninyzwitty/sqs-postgres-microservice-inventory/internal/pkg"
+	"github.com/yaninyzwitty/sqs-postgres-microservice-inventory/service"
 )
+
+var (
+	queueURL    = "https://sqs.eu-north-1.amazonaws.com/651706749096/witty-queue"
+	snsTopicArn = "arn:aws:sns:eu-north-1:651706749096:witty-topic"
+)
+
+// sqs_arn     = "arn:aws:sqs:eu-north-1:651706749096:witty-queue"
 
 func main() {
 	file, err := os.Open("config.yaml")
@@ -53,25 +60,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	snsTopicArn, err := aws.CreateSnsTopicARN(ctx, "witty-topic", snsClient)
-	if err != nil {
-		slog.Error("Failed to create sns topic", "error", err)
-		os.Exit(1)
-	}
-	fmt.Println(snsTopicArn)
-
 	sqsClient, err := aws.LoadSQSClient(ctx, cfg.AWS.Region)
 	if err != nil {
 		slog.Error("failed to load  and create sqs client", "error", err)
 		os.Exit(1)
 	}
 
-	queueURL, err := aws.CreateQueueURL(ctx, "witty-queue", sqsClient)
-	if err != nil {
-		slog.Error("failed to create queue url", "error", err)
-		os.Exit(1)
-	}
-
-	fmt.Println(queueURL)
+	inventoryService := service.NewInventoryService(db, snsClient, sqsClient, &snsTopicArn, &queueURL)
+	// process all order messages
+	inventoryService.ProcessOrderMessage(ctx)
 
 }
